@@ -1,0 +1,36 @@
+# Compilados de Maven
+target/
+
+# Archivos de clase Java
+*.class
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+
+# VSCode
+.vscode/
+
+# Eclipse
+.classpath
+.project
+.settings/
+
+# NetBeans
+nbproject/
+nb-configuration.xml
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Variables de entorno locales
+.env
+
+# Repositorio local de Maven (se descarga automáticamente)
+maven-repo/
+maven-wrapper/
