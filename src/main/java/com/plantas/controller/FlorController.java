@@ -7,7 +7,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.data.domain.Page;
+
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/flores")
@@ -19,12 +23,20 @@ public class FlorController {
         this.service = service;
     }
 
-    // ---- GET /api/flores ----
+    // ---- GET /api/flores?page=0&size=20 ----
     @GetMapping
-    public ResponseEntity<ApiResponse<List<Flor>>> findAll() {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> findAll(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
         try {
-            List<Flor> flores = service.findAll();
-            return ResponseEntity.ok(new ApiResponse<>(true, "OK", flores));
+            Page<Flor> result = service.findAllPaged(page, size);
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("flores", result.getContent());
+            data.put("totalElements", result.getTotalElements());
+            data.put("totalPages", result.getTotalPages());
+            data.put("currentPage", result.getNumber());
+            data.put("pageSize", result.getSize());
+            return ResponseEntity.ok(new ApiResponse<>(true, "OK", data));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new ApiResponse<>(false, e.getMessage(), null));

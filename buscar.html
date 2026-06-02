@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flores — Buscar</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<nav class="sidebar" role="navigation" aria-label="Menú principal">
+    <div class="sidebar-logo">
+        Flores API
+        <span>Panel de gestión</span>
+    </div>
+    <a href="index.html" class="nav-item">🏠 Inicio</a>
+    <a href="lista.html" class="nav-item">🌸 Ver flores</a>
+    <a href="crear.html" class="nav-item">➕ Agregar flor</a>
+    <a href="buscar.html" class="nav-item active" aria-current="page">🔍 Buscar</a>
+</nav>
+
+<div class="main">
+    <div class="topbar">Buscar flores</div>
+    <div class="content">
+
+        <div class="search-bar" role="search">
+            <label for="buscar-input" class="sr-only">Término de búsqueda</label>
+            <input type="search" id="buscar-input" placeholder="Buscar..."
+                   aria-label="Término de búsqueda"
+                   onkeydown="if(event.key==='Enter') buscar()">
+            <label for="buscar-tipo" class="sr-only">Tipo de búsqueda</label>
+            <select id="buscar-tipo" aria-label="Tipo de búsqueda">
+                <option value="nombre">Por nombre</option>
+                <option value="color">Por color</option>
+                <option value="temporada">Por temporada</option>
+            </select>
+            <button class="btn-primary" onclick="buscar()">Buscar</button>
+        </div>
+
+        <div id="buscar-resultado" aria-live="polite"></div>
+
+    </div>
+</div>
+
+<output class="toast" id="toast" aria-live="polite" aria-atomic="true"></output>
+
+<script>
+const BASE = 'http://localhost:8080/api/flores';
+
+// Restaurar búsqueda desde la URL al cargar
+const params = new URLSearchParams(location.search);
+if (params.get('q')) {
+    document.getElementById('buscar-input').value = params.get('q');
+    document.getElementById('buscar-tipo').value = params.get('tipo') || 'nombre';
+    ejecutarBusqueda();
+}
+
+async function buscar() {
+    const valor = document.getElementById('buscar-input').value.trim();
+    const tipo  = document.getElementById('buscar-tipo').value;
+    if (!valor) { toast('Ingresa un término de búsqueda', true); return; }
+    history.replaceState(null, '', `?q=${encodeURIComponent(valor)}&tipo=${tipo}`);
+    await ejecutarBusqueda();
+}
+
+async function ejecutarBusqueda() {
+    const valor = document.getElementById('buscar-input').value.trim();
+    const tipo  = document.getElementById('buscar-tipo').value;
+    if (!valor) return;
+
+    const urls = {
+        nombre:    `${BASE}/buscar?nombre=${encodeURIComponent(valor)}`,
+        color:     `${BASE}/color?color=${encodeURIComponent(valor)}`,
+        temporada: `${BASE}/temporada?temporada=${encodeURIComponent(valor)}`
+    };
+
+    const container = document.getElementById('buscar-resultado');
+    container.innerHTML = '<div class="empty">Buscando...</div>';
+
+    try {
+        const r = await fetch(urls[tipo]);
+        const json = await r.json();
+        const flores = json.data || [];
+
+        if (flores.length === 0) {
+            container.innerHTML = '<div class="empty">Sin resultados.</div>';
+            return;
+        }
+
+        container.innerHTML = `
+            <table aria-label="Resultados de búsqueda">
+                <thead>
+                    <tr>
+                        <th scope="col">ID</th><th scope="col">Nombre</th><th scope="col">Color</th>
+                        <th scope="col">Familia</th><th scope="col">Precio</th>
+                        <th scope="col">Temporada</th><th scope="col">Disponible</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${flores.map(f => `
+                    <tr>
+                        <td>${f.id}</td>
+                        <td><strong>${f.nombre}</strong></td>
+                        <td>${f.color || '—'}</td>
+                        <td>${f.familia || '—'}</td>
+                        <td>${f.precio != null ? '$' + f.precio.toFixed(2) : '—'}</td>
+                        <td>${f.temporada || '—'}</td>
+                        <td><span class="${f.disponible ? 'badge-si' : 'badge-no'}">${f.disponible ? 'Sí' : 'No'}</span></td>
+                    </tr>`).join('')}
+                </tbody>
+            </table>`;
+    } catch {
+        container.innerHTML = '<div class="empty">No se pudo conectar con el servidor.</div>';
+    }
+}
+
+function toast(msg, error = false) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = 'toast show' + (error ? ' error' : '');
+    setTimeout(() => { el.className = 'toast'; }, 2800);
+}
+</script>
+</body>
+</html>

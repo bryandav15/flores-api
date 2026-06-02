@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flores — Lista</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<nav class="sidebar" role="navigation" aria-label="Menú principal">
+    <div class="sidebar-logo">
+        Flores API
+        <span>Panel de gestión</span>
+    </div>
+    <a href="/" class="nav-item">🏠 Inicio</a>
+    <a href="/lista" class="nav-item active" aria-current="page">🌸 Ver flores</a>
+    <a href="/crear" class="nav-item">➕ Agregar flor</a>
+    <a href="/buscar" class="nav-item">🔍 Buscar</a>
+</nav>
+
+<div class="main">
+    <div class="topbar">Flores registradas</div>
+    <div class="content">
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; flex-wrap:wrap; gap:10px;">
+            <span style="font-size:13px;color:#666;" id="lista-count" aria-live="polite"></span>
+            <a href="/crear" class="btn-primary">+ Agregar flor</a>
+        </div>
+
+        <div id="tabla-container">
+            <div class="empty">Cargando...</div>
+        </div>
+
+        <nav id="paginacion" aria-label="Paginación de flores"></nav>
+
+    </div>
+</div>
+
+<!-- MODAL EDITAR -->
+<dialog class="modal" id="modal-editar" aria-labelledby="modal-titulo">
+    <h3 id="modal-titulo">Editar flor</h3>
+    <input type="hidden" id="e-id">
+    <div class="form-row">
+        <label for="e-nombre">Nombre <span class="required" aria-hidden="true">*</span><span class="sr-only">(requerido)</span></label>
+        <input type="text" id="e-nombre" required aria-required="true">
+    </div>
+    <div class="form-cols">
+        <div class="form-row">
+            <label for="e-color">Color</label>
+            <input type="text" id="e-color">
+        </div>
+        <div class="form-row">
+            <label for="e-familia">Familia</label>
+            <input type="text" id="e-familia">
+        </div>
+    </div>
+    <div class="form-row">
+        <label for="e-descripcion">Descripción</label>
+        <input type="text" id="e-descripcion">
+    </div>
+    <div class="form-cols">
+        <div class="form-row">
+            <label for="e-precio">Precio</label>
+            <input type="number" id="e-precio" step="0.01" min="0">
+        </div>
+        <div class="form-row">
+            <label for="e-temporada">Temporada</label>
+            <select id="e-temporada">
+                <option value="">-- ninguna --</option>
+                <option value="primavera">Primavera</option>
+                <option value="verano">Verano</option>
+                <option value="otoño">Otoño</option>
+                <option value="invierno">Invierno</option>
+                <option value="todo el año">Todo el año</option>
+            </select>
+        </div>
+    </div>
+    <div class="form-row">
+        <label for="e-disponible">Disponible</label>
+        <select id="e-disponible">
+            <option value="true">Sí</option>
+            <option value="false">No</option>
+        </select>
+    </div>
+    <div class="form-actions">
+        <button class="btn-primary" onclick="guardarEdicion()">Guardar cambios</button>
+        <button class="btn-secondary" onclick="cerrarModal()">Cancelar</button>
+    </div>
+</dialog>
+
+<output class="toast" id="toast" aria-live="polite" aria-atomic="true"></output>
+
+<script type="module">
+const BASE = 'http://localhost:8080/api/flores';
+const PAGE_SIZE = 20;
+const params = new URLSearchParams(location.search);
+let totalPages = 0;
+let currentPage = Number.parseInt(params.get('page') || '0', 10);
+
+await cargarTabla(currentPage);
+
+async function cargarTabla(page) {
+    currentPage = page;
+    const container = document.getElementById('tabla-container');
+    container.innerHTML = '<div class="empty">Cargando...</div>';
+    try {
+        const r = await fetch(`${BASE}?page=${page}&size=${PAGE_SIZE}`);
+        const json = await r.json();
+        const flores = json.data.flores || [];
+        totalPages = json.data.totalPages || 1;
+        const totalElements = json.data.totalElements || 0;
+
+        document.getElementById('lista-count').textContent = `${totalElements} flor(es) registrada(s)`;
+
+        if (flores.length === 0) {
+            container.innerHTML = '<div class="empty">No hay flores registradas aún.</div>';
+            renderPaginacion();
+            return;
+        }
+
+        container.innerHTML = `
+            <table aria-label="Lista de flores">
+                <thead>
+                    <tr>
+                        <th scope="col">ID</th><th scope="col">Nombre</th><th scope="col">Color</th>
+                        <th scope="col">Familia</th><th scope="col">Precio</th>
+                        <th scope="col">Temporada</th><th scope="col">Disponible</th><th scope="col">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${flores.map(f => `
+                    <tr>
+                        <td>${f.id}</td>
+                        <td><strong>${f.nombre}</strong></td>
+                        <td>${f.color || '—'}</td>
+                        <td>${f.familia || '—'}</td>
+                        <td>${f.precio == null ? '—' : '$' + f.precio.toFixed(2)}</td>
+                        <td>${f.temporada || '—'}</td>
+                        <td><span class="${f.disponible ? 'badge-si' : 'badge-no'}">${f.disponible ? 'Sí' : 'No'}</span></td>
+                        <td style="display:flex;gap:6px;">
+                            <button class="btn btn-edit" onclick="abrirEditar(${f.id})" aria-label="Editar ${f.nombre}">Editar</button>
+                            <button class="btn btn-delete" onclick="eliminar(${f.id}, '${f.nombre.replaceAll("'", String.raw`\'`)}')" aria-label="Eliminar ${f.nombre}">Eliminar</button>
+                        </td>
+                    </tr>`).join('')}
+                </tbody>
+            </table>`;
+        renderPaginacion();
+    } catch {
+        container.innerHTML = '<div class="empty">No se pudo conectar con el servidor.</div>';
+    }
+}
+
+function renderPaginacion() {
+    const el = document.getElementById('paginacion');
+    if (totalPages <= 1) { el.innerHTML = ''; return; }
+    el.innerHTML = `
+        <div class="pag-controls">
+            <button class="btn-pag" onclick="cambiarPagina(${currentPage - 1})"
+                ${currentPage === 0 ? 'disabled aria-disabled="true"' : ''}
+                aria-label="Página anterior">&#8592; Anterior</button>
+            <span aria-live="polite" aria-atomic="true">Página ${currentPage + 1} de ${totalPages}</span>
+            <button class="btn-pag" onclick="cambiarPagina(${currentPage + 1})"
+                ${currentPage >= totalPages - 1 ? 'disabled aria-disabled="true"' : ''}
+                aria-label="Página siguiente">Siguiente &#8594;</button>
+        </div>`;
+}
+
+async function cambiarPagina(page) {
+    if (page < 0 || page >= totalPages) return;
+    history.pushState(null, '', '?page=' + page);
+    await cargarTabla(page);
+}
+
+globalThis.addEventListener('popstate', async () => {
+    const p = Number.parseInt(new URLSearchParams(location.search).get('page') || '0', 10);
+    await cargarTabla(p);
+});
+
+async function abrirEditar(id) {
+    const r = await fetch(`${BASE}/${id}`);
+    const json = await r.json();
+    const f = json.data;
+    document.getElementById('e-id').value          = f.id;
+    document.getElementById('e-nombre').value      = f.nombre || '';
+    document.getElementById('e-color').value       = f.color || '';
+    document.getElementById('e-familia').value     = f.familia || '';
+    document.getElementById('e-descripcion').value = f.descripcion || '';
+    document.getElementById('e-precio').value      = f.precio == null ? '' : f.precio;
+    document.getElementById('e-temporada').value   = f.temporada || '';
+    document.getElementById('e-disponible').value  = f.disponible ? 'true' : 'false';
+    const modal = document.getElementById('modal-editar');
+    modal.showModal();
+    modal.querySelector('#e-nombre').focus();
+}
+
+function cerrarModal() {
+    document.getElementById('modal-editar').close();
+}
+
+async function guardarEdicion() {
+    const id     = document.getElementById('e-id').value;
+    const nombre = document.getElementById('e-nombre').value.trim();
+    if (!nombre) { toast('El nombre es requerido', true); return; }
+
+    const body = {
+        nombre,
+        color:       document.getElementById('e-color').value.trim() || null,
+        familia:     document.getElementById('e-familia').value.trim() || null,
+        descripcion: document.getElementById('e-descripcion').value.trim() || null,
+        precio:      document.getElementById('e-precio').value ? Number.parseFloat(document.getElementById('e-precio').value) : null,
+        temporada:   document.getElementById('e-temporada').value || null,
+        disponible:  document.getElementById('e-disponible').value === 'true'
+    };
+
+    const r = await fetch(`${BASE}/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const json = await r.json();
+    if (json.success) {
+        toast('Flor actualizada');
+        cerrarModal();
+        await cargarTabla(currentPage);
+    } else {
+        toast(json.message, true);
+    }
+}
+
+async function eliminar(id, nombre) {
+    if (confirm(`¿Eliminar "${nombre}"?`)) {
+        const r = await fetch(`${BASE}/${id}`, { method: 'DELETE' });
+        const json = await r.json();
+        if (json.success) {
+            toast('Flor eliminada');
+            await cargarTabla(currentPage);
+        } else {
+            toast(json.message, true);
+        }
+    }
+}
+
+function toast(msg, error = false) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = 'toast show' + (error ? ' error' : '');
+    setTimeout(() => { el.className = 'toast'; }, 2800);
+}
+
+document.getElementById('modal-editar').addEventListener('click', function(e) {
+    const rect = this.getBoundingClientRect();
+    if (e.clientX < rect.left || e.clientX > rect.right ||
+        e.clientY < rect.top  || e.clientY > rect.bottom) {
+        this.close();
+    }
+});
+
+globalThis.abrirEditar    = abrirEditar;
+globalThis.eliminar       = eliminar;
+globalThis.guardarEdicion = guardarEdicion;
+globalThis.cerrarModal    = cerrarModal;
+globalThis.cambiarPagina  = cambiarPagina;
+</script>
+</body>
+</html>

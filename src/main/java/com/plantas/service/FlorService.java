@@ -2,6 +2,9 @@ package com.plantas.service;
 
 import com.plantas.model.Flor;
 import com.plantas.repository.FlorRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -18,6 +21,11 @@ public class FlorService {
     // ---- Obtener todas ----
     public List<Flor> findAll() {
         return repository.findAll();
+    }
+
+    // ---- Obtener paginado ----
+    public Page<Flor> findAllPaged(int page, int size) {
+        return repository.findAll(PageRequest.of(page, size, Sort.by("id").ascending()));
     }
 
     // ---- Obtener por ID ----
